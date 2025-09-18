@@ -26,11 +26,13 @@ export const supabase = createClient(
 // Security middleware
 app.use(helmet());
 
-// Rate limiting
+// Rate limiting - Very permissive for development
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  max: 10000, // limit each IP to 10000 requests per windowMs (very high for development)
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 

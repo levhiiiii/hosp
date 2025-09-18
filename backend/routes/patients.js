@@ -4,6 +4,93 @@ import { authenticateToken, requireStaff, requireReceptionist } from '../middlew
 
 const router = express.Router();
 
+// @route   GET /api/patients/total-amount
+// @desc    Get total amount for all patients (with filters)
+// @access  Private (Doctor and Receptionist)
+router.get('/total-amount', async (req, res) => {
+  try {
+    const { startDate, endDate, status } = req.query;
+    
+    let query = supabase
+      .from('patients')
+      .select('fees', { count: 'exact' });
+
+    // Add date filter
+    if (startDate) {
+      const startDateTime = new Date(startDate + 'T00:00:00.000Z');
+      query = query.gte('created_at', startDateTime.toISOString());
+    }
+    if (endDate) {
+      const endDateTime = new Date(endDate + 'T00:00:00.000Z');
+      endDateTime.setDate(endDateTime.getDate() + 1);
+      query = query.lt('created_at', endDateTime.toISOString());
+    }
+
+    // Add status filter
+    if (status && status !== 'all') {
+      query = query.eq('status', status);
+    }
+
+    const { data: patients, error } = await query;
+
+    if (error) {
+      console.error('Get total amount error:', error);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch total amount'
+      });
+    }
+
+    // Calculate total amount
+    const totalAmount = patients.reduce((sum, patient) => {
+      return sum + (parseFloat(patient.fees) || 0);
+    }, 0);
+
+    res.json({
+      success: true,
+      data: {
+        totalAmount,
+        totalPatients: patients.length
+      }
+    });
+  } catch (error) {
+    console.error('Get total amount error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Server error'
+    });
+  }
+});
+
+// @route   GET /api/patients/test-search
+// @desc    Test search functionality
+// @access  Private (Doctor and Receptionist)
+router.get('/test-search', authenticateToken, requireStaff, async (req, res) => {
+  try {
+    const { search } = req.query;
+    console.log('🧪 Test search endpoint - search term:', search);
+    
+    let query = supabase.from('patients').select('*');
+    
+    if (search && search.trim()) {
+      query = query.ilike('full_name', `%${search.trim()}%`);
+    }
+    
+    const { data: patients, error } = await query;
+    
+    if (error) {
+      console.error('Test search error:', error);
+      return res.status(500).json({ success: false, error: error.message });
+    }
+    
+    console.log('🧪 Test search results:', patients.length, 'patients found');
+    res.json({ success: true, patients, count: patients.length });
+  } catch (error) {
+    console.error('Test search error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 // @route   GET /api/patients
 // @desc    Get all patients (with pagination and search)
 // @access  Private (Doctor and Receptionist)
@@ -12,11 +99,14 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
     const { 
       page = 1, 
       limit = 10, 
-      search = '', 
-      status = '',
+      search = '',
       sortBy = 'created_at',
       sortOrder = 'desc'
     } = req.query;
+
+    // Debug: Log search parameters
+    console.log('🔍 Backend received search:', search);
+    console.log('🔍 All query params:', req.query);
 
     const offset = (page - 1) * limit;
 
@@ -26,13 +116,15 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
       .select('*', { count: 'exact' });
 
     // Add search filter
-    if (search) {
-      query = query.or(`full_name.ilike.%${search}%,phone.ilike.%${search}%,patient_id.ilike.%${search}%`);
-    }
-
-    // Add status filter
-    if (status) {
-      query = query.eq('status', status);
+    if (search && search.trim()) {
+      console.log('🔍 Applying search filter for:', search);
+      const searchTerm = search.trim();
+      
+      // Try a simpler approach - search in full_name first
+      query = query.ilike('full_name', `%${searchTerm}%`);
+      console.log('✅ Search filter applied (full_name only)');
+    } else {
+      console.log('⚠️ No search filter applied');
     }
 
     // Add sorting
@@ -41,7 +133,11 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
     // Add pagination
     query = query.range(offset, offset + limit - 1);
 
+    console.log('🔍 Executing query...');
     const { data: patients, error, count } = await query;
+    console.log('🔍 Query executed. Error:', error);
+    console.log('🔍 Query result count:', count);
+    console.log('🔍 Query result data length:', patients?.length);
 
     if (error) {
       console.error('Get patients error:', error);
@@ -51,10 +147,28 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
       });
     }
 
+    // Debug: Log search results
+    console.log('🔍 Search results:', {
+      searchTerm: search,
+      patientsFound: patients?.length || 0,
+      totalCount: count
+    });
+    
+    // Debug: Log patient names for search verification
+    if (search && search.trim() && patients) {
+      console.log('🔍 Patient names found:', patients.map(p => p.full_name));
+    }
+
+    // Calculate total amount for current page patients
+    const totalAmount = patients.reduce((sum, patient) => {
+      return sum + (parseFloat(patient.fees) || 0);
+    }, 0);
+
     res.json({
       success: true,
       data: {
         patients,
+        totalAmount,
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(count / limit),
@@ -112,71 +226,68 @@ router.get('/:id', authenticateToken, requireStaff, async (req, res) => {
 router.post('/', authenticateToken, requireReceptionist, async (req, res) => {
   try {
     const {
+      patient_id,
       full_name,
       age,
-      gender,
-      phone,
+      mobile_number,
       address,
-      emergency_contact,
-      emergency_phone,
-      blood_group,
-      height,
-      weight,
-      chief_complaint,
-      symptoms,
-      medical_history,
-      allergies,
-      current_medications,
-      vital_signs
+      opd_number,
+      reference,
+      dressing,
+      plaster,
+      xray,
+      fees
     } = req.body;
 
-    // Validation
-    if (!full_name || !age || !gender || !phone || !chief_complaint) {
+    // Validation for new simplified form
+    if (!full_name || !age || !mobile_number || !fees) {
       return res.status(400).json({
         success: false,
-        message: 'Required fields: full_name, age, gender, phone, chief_complaint'
+        message: 'Required fields: full_name, age, mobile_number, fees'
       });
     }
 
-    // Generate patient ID
-    const patientId = `KAH${Date.now()}`;
+    // Use provided patient_id or generate one
+    const patientId = patient_id || `KAH${Date.now()}`;
 
-    // Create patient record
+    // Create patient record (only with existing columns for now)
+    const patientData = {
+      patient_id: patientId,
+      full_name,
+      age: parseInt(age),
+      gender: 'other', // Default gender since not in new form
+      phone: mobile_number, // Map mobile_number to phone column
+      address: address || null,
+      chief_complaint: 'General consultation', // Default since not in new form
+      status: 'checked_in',
+      checked_in_by: req.user.id,
+      checked_in_at: new Date().toISOString(),
+      created_at: new Date().toISOString()
+    };
+
+    // Add new fields only if they exist in the database
+    if (opd_number) patientData.opd_number = opd_number;
+    if (reference) patientData.reference = reference;
+    if (dressing !== undefined) patientData.dressing = dressing;
+    if (plaster !== undefined) patientData.plaster = plaster;
+    if (xray !== undefined) patientData.xray = xray;
+    if (fees !== undefined) patientData.fees = parseFloat(fees);
+
+    console.log('Creating patient with data:', patientData);
+
     const { data: patient, error } = await supabase
       .from('patients')
-      .insert([
-        {
-          patient_id: patientId,
-          full_name,
-          age: parseInt(age),
-          gender,
-          phone,
-          address,
-          emergency_contact,
-          emergency_phone,
-          blood_group,
-          height: height ? parseFloat(height) : null,
-          weight: weight ? parseFloat(weight) : null,
-          chief_complaint,
-          symptoms,
-          medical_history,
-          allergies,
-          current_medications,
-          vital_signs,
-          status: 'checked_in',
-          checked_in_by: req.user.id,
-          checked_in_at: new Date().toISOString(),
-          created_at: new Date().toISOString()
-        }
-      ])
+      .insert([patientData])
       .select()
       .single();
 
     if (error) {
       console.error('Create patient error:', error);
+      console.error('Error details:', JSON.stringify(error, null, 2));
       return res.status(500).json({
         success: false,
-        message: 'Failed to create patient record'
+        message: 'Failed to create patient record',
+        error: error.message
       });
     }
 

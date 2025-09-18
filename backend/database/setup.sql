@@ -37,6 +37,13 @@ CREATE TABLE IF NOT EXISTS patients (
     allergies TEXT,
     current_medications TEXT,
     vital_signs JSONB, -- Store as JSON: {"bp": "120/80", "pulse": "72", "temp": "98.6", "resp": "16"}
+    -- New fields for simplified check-in form
+    opd_number VARCHAR(50),
+    reference VARCHAR(100),
+    dressing BOOLEAN DEFAULT FALSE,
+    plaster BOOLEAN DEFAULT FALSE,
+    xray BOOLEAN DEFAULT FALSE,
+    fees DECIMAL(10,2) DEFAULT 0.00,
     status VARCHAR(20) DEFAULT 'checked_in' CHECK (status IN ('checked_in', 'in_consultation', 'completed', 'discharged', 'deleted')),
     status_notes TEXT,
     checked_in_by UUID REFERENCES users(id),
