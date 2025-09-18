@@ -88,90 +88,127 @@ const PatientDetailsPage = () => {
         )}
       </motion.div>
 
-      {/* Status & Basic Info */}
+      {/* Patient Information Card */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.1 }}
         className="bg-white rounded-xl shadow-soft p-6"
       >
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-6">
           <h2 className="text-xl font-semibold text-secondary-900">
-            Patient Status
+            Patient Information
           </h2>
           <span className={`px-3 py-1 rounded-full text-sm font-medium ${formattedPatient.statusColor}`}>
             {formattedPatient.statusLabel}
           </span>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="flex items-center space-x-3">
-            <FiClock className="w-5 h-5 text-secondary-500" />
-            <div>
-              <p className="text-sm text-secondary-500">Check-in Time</p>
-              <p className="font-medium text-secondary-900">
-                {new Date(currentPatient.created_at).toLocaleString()}
-              </p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="bg-primary-50 p-4 rounded-lg">
+            <p className="text-sm text-primary-600 mb-1">Sr No</p>
+            <p className="font-bold text-primary-900 text-lg">{currentPatient.patient_id}</p>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <FiUser className="w-5 h-5 text-secondary-500" />
-            <div>
-              <p className="text-sm text-secondary-500">Age & Gender</p>
-              <p className="font-medium text-secondary-900">
-                {formattedPatient.age} • {formattedPatient.gender}
-              </p>
-            </div>
+          <div className="bg-secondary-50 p-4 rounded-lg">
+            <p className="text-sm text-secondary-600 mb-1">Patient Name</p>
+            <p className="font-bold text-secondary-900 text-lg">{currentPatient.full_name}</p>
           </div>
           
-          <div className="flex items-center space-x-3">
-            <FiActivity className="w-5 h-5 text-secondary-500" />
-            <div>
-              <p className="text-sm text-secondary-500">BMI</p>
-              <p className="font-medium text-secondary-900">
-                {formattedPatient.bmi}
-              </p>
-            </div>
+          <div className="bg-success-50 p-4 rounded-lg">
+            <p className="text-sm text-success-600 mb-1">Age</p>
+            <p className="font-bold text-success-900 text-lg">{currentPatient.age} years</p>
+          </div>
+          
+          <div className="bg-warning-50 p-4 rounded-lg">
+            <p className="text-sm text-warning-600 mb-1">Mobile Number</p>
+            <p className="font-bold text-warning-900 text-lg">{currentPatient.phone}</p>
+          </div>
+          
+          <div className="bg-info-50 p-4 rounded-lg">
+            <p className="text-sm text-info-600 mb-1">OPD Number</p>
+            <p className="font-bold text-info-900 text-lg">{currentPatient.opd_number || 'Not assigned'}</p>
+          </div>
+          
+          <div className="bg-purple-50 p-4 rounded-lg">
+            <p className="text-sm text-purple-600 mb-1">Consultation Fees</p>
+            <p className="font-bold text-purple-900 text-lg">₹{currentPatient.fees || '0.00'}</p>
           </div>
         </div>
+        
+        {currentPatient.address && (
+          <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+            <p className="text-sm text-gray-600 mb-2">Address</p>
+            <p className="font-medium text-gray-900">{currentPatient.address}</p>
+          </div>
+        )}
+        
+        {currentPatient.reference && (
+          <div className="mt-4 bg-blue-50 p-4 rounded-lg">
+            <p className="text-sm text-blue-600 mb-2">Reference</p>
+            <p className="font-medium text-blue-900">{currentPatient.reference}</p>
+          </div>
+        )}
       </motion.div>
 
-      {/* Contact Information */}
+      {/* Services Required */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.2 }}
         className="bg-white rounded-xl shadow-soft p-6"
       >
-        <h2 className="text-xl font-semibold text-secondary-900 mb-4 flex items-center">
-          <FiPhone className="w-5 h-5 mr-2 text-primary-600" />
-          Contact Information
+        <h2 className="text-xl font-semibold text-secondary-900 mb-6">
+          Services Required
         </h2>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <p className="text-sm text-secondary-500 mb-1">Phone Number</p>
-            <p className="font-medium text-secondary-900">{currentPatient.phone}</p>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className={`p-4 rounded-lg border-2 ${currentPatient.dressing ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="flex items-center space-x-3">
+              <div className={`w-4 h-4 rounded-full ${currentPatient.dressing ? 'bg-blue-500' : 'bg-gray-300'}`}></div>
+              <span className={`font-medium ${currentPatient.dressing ? 'text-blue-900' : 'text-gray-500'}`}>
+                Dressing
+              </span>
+            </div>
+            {currentPatient.dressing && (
+              <p className="text-sm text-blue-600 mt-2">✓ Service requested</p>
+            )}
           </div>
           
-          {currentPatient.emergency_contact && (
-            <div>
-              <p className="text-sm text-secondary-500 mb-1">Emergency Contact</p>
-              <p className="font-medium text-secondary-900">{currentPatient.emergency_contact}</p>
+          <div className={`p-4 rounded-lg border-2 ${currentPatient.plaster ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="flex items-center space-x-3">
+              <div className={`w-4 h-4 rounded-full ${currentPatient.plaster ? 'bg-green-500' : 'bg-gray-300'}`}></div>
+              <span className={`font-medium ${currentPatient.plaster ? 'text-green-900' : 'text-gray-500'}`}>
+                Plaster
+              </span>
             </div>
-          )}
+            {currentPatient.plaster && (
+              <p className="text-sm text-green-600 mt-2">✓ Service requested</p>
+            )}
+          </div>
           
-          {currentPatient.address && (
-            <div className="md:col-span-2">
-              <p className="text-sm text-secondary-500 mb-1">Address</p>
-              <p className="font-medium text-secondary-900">{currentPatient.address}</p>
+          <div className={`p-4 rounded-lg border-2 ${currentPatient.xray ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'}`}>
+            <div className="flex items-center space-x-3">
+              <div className={`w-4 h-4 rounded-full ${currentPatient.xray ? 'bg-purple-500' : 'bg-gray-300'}`}></div>
+              <span className={`font-medium ${currentPatient.xray ? 'text-purple-900' : 'text-gray-500'}`}>
+                X-Ray
+              </span>
             </div>
-          )}
+            {currentPatient.xray && (
+              <p className="text-sm text-purple-600 mt-2">✓ Service requested</p>
+            )}
+          </div>
         </div>
+        
+        {!currentPatient.dressing && !currentPatient.plaster && !currentPatient.xray && (
+          <div className="text-center py-8">
+            <p className="text-gray-500 text-lg">No additional services requested</p>
+            <p className="text-gray-400 text-sm mt-1">Only consultation fees apply</p>
+          </div>
+        )}
       </motion.div>
 
-      {/* Physical Details & Vital Signs */}
+      {/* Check-in Information */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -179,117 +216,24 @@ const PatientDetailsPage = () => {
         className="bg-white rounded-xl shadow-soft p-6"
       >
         <h2 className="text-xl font-semibold text-secondary-900 mb-4 flex items-center">
-          <FiActivity className="w-5 h-5 mr-2 text-primary-600" />
-          Physical Details & Vital Signs
+          <FiClock className="w-5 h-5 mr-2 text-primary-600" />
+          Check-in Information
         </h2>
         
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-6">
-          <div className="text-center p-4 bg-primary-50 rounded-lg">
-            <p className="text-sm text-primary-600 mb-1">Height</p>
-            <p className="text-xl font-bold text-primary-900">{formattedPatient.height}</p>
-          </div>
-          
-          <div className="text-center p-4 bg-success-50 rounded-lg">
-            <p className="text-sm text-success-600 mb-1">Weight</p>
-            <p className="text-xl font-bold text-success-900">{formattedPatient.weight}</p>
-          </div>
-          
-          <div className="text-center p-4 bg-warning-50 rounded-lg">
-            <p className="text-sm text-warning-600 mb-1">BMI</p>
-            <p className="text-xl font-bold text-warning-900">{formattedPatient.bmi}</p>
-          </div>
-          
-          <div className="text-center p-4 bg-secondary-50 rounded-lg">
-            <p className="text-sm text-secondary-600 mb-1">Age</p>
-            <p className="text-xl font-bold text-secondary-900">{currentPatient.age}</p>
-          </div>
-        </div>
-        
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          <div className="text-center p-3 border border-secondary-200 rounded-lg">
-            <p className="text-xs text-secondary-500 mb-1">Blood Pressure</p>
-            <p className="font-semibold text-secondary-900">{vitalSigns.bp}</p>
-          </div>
-          
-          <div className="text-center p-3 border border-secondary-200 rounded-lg">
-            <p className="text-xs text-secondary-500 mb-1">Pulse</p>
-            <p className="font-semibold text-secondary-900">{vitalSigns.pulse}</p>
-          </div>
-          
-          <div className="text-center p-3 border border-secondary-200 rounded-lg">
-            <p className="text-xs text-secondary-500 mb-1">Temperature</p>
-            <p className="font-semibold text-secondary-900">{vitalSigns.temp}</p>
-          </div>
-          
-          <div className="text-center p-3 border border-secondary-200 rounded-lg">
-            <p className="text-xs text-secondary-500 mb-1">Respiration</p>
-            <p className="font-semibold text-secondary-900">{vitalSigns.resp}</p>
-          </div>
-          
-          <div className="text-center p-3 border border-secondary-200 rounded-lg">
-            <p className="text-xs text-secondary-500 mb-1">SpO2</p>
-            <p className="font-semibold text-secondary-900">{vitalSigns.spo2}</p>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Medical Information */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.4 }}
-        className="bg-white rounded-xl shadow-soft p-6"
-      >
-        <h2 className="text-xl font-semibold text-secondary-900 mb-4 flex items-center">
-          <FiFileText className="w-5 h-5 mr-2 text-primary-600" />
-          Medical Information
-        </h2>
-        
-        <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h3 className="font-medium text-secondary-900 mb-2">Chief Complaint</h3>
-            <p className="text-secondary-700 bg-secondary-50 p-3 rounded-lg">
-              {currentPatient.chief_complaint || 'Not specified'}
+            <p className="text-sm text-secondary-500 mb-1">Check-in Time</p>
+            <p className="font-medium text-secondary-900">
+              {new Date(currentPatient.created_at).toLocaleString()}
             </p>
           </div>
           
-          {currentPatient.symptoms && (
-            <div>
-              <h3 className="font-medium text-secondary-900 mb-2">Symptoms</h3>
-              <p className="text-secondary-700 bg-secondary-50 p-3 rounded-lg">
-                {currentPatient.symptoms}
-              </p>
-            </div>
-          )}
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {currentPatient.medical_history && (
-              <div>
-                <h3 className="font-medium text-secondary-900 mb-2">Medical History</h3>
-                <p className="text-secondary-700 bg-secondary-50 p-3 rounded-lg text-sm">
-                  {currentPatient.medical_history}
-                </p>
-              </div>
-            )}
-            
-            {currentPatient.current_medications && (
-              <div>
-                <h3 className="font-medium text-secondary-900 mb-2">Current Medications</h3>
-                <p className="text-secondary-700 bg-secondary-50 p-3 rounded-lg text-sm">
-                  {currentPatient.current_medications}
-                </p>
-              </div>
-            )}
+          <div>
+            <p className="text-sm text-secondary-500 mb-1">Status</p>
+            <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${formattedPatient.statusColor}`}>
+              {formattedPatient.statusLabel}
+            </span>
           </div>
-          
-          {currentPatient.allergies && (
-            <div>
-              <h3 className="font-medium text-secondary-900 mb-2">Allergies</h3>
-              <p className="text-error-700 bg-error-50 p-3 rounded-lg">
-                {currentPatient.allergies}
-              </p>
-            </div>
-          )}
         </div>
       </motion.div>
     </div>

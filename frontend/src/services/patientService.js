@@ -11,13 +11,45 @@ const patientService = {
     
     // Add filter params
     if (params.search) queryParams.append('search', params.search)
-    if (params.status) queryParams.append('status', params.status)
     if (params.sortBy) queryParams.append('sortBy', params.sortBy)
     if (params.sortOrder) queryParams.append('sortOrder', params.sortOrder)
     
     const url = `/patients${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+    
+    // Debug: Log the constructed URL
+    console.log('🔍 PatientService URL:', url);
+    console.log('🔍 Query params string:', queryParams.toString());
+    
     const response = await apiGet(url)
     return response
+  },
+
+  // Get total amount for all patients (with filters)
+  getTotalAmount: async (params = {}) => {
+    try {
+      const queryParams = new URLSearchParams()
+      
+      // Add filter params
+      if (params.status) queryParams.append('status', params.status)
+      
+      // Add date filter params
+      if (params.startDate) queryParams.append('startDate', params.startDate)
+      if (params.endDate) queryParams.append('endDate', params.endDate)
+      
+      const url = `/patients/total-amount${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+      const response = await apiGet(url)
+      return response
+    } catch (error) {
+      // If the endpoint doesn't exist yet, return a default response
+      console.warn('Total amount endpoint not available yet:', error.message)
+      return {
+        success: true,
+        data: {
+          totalAmount: 0,
+          totalPatients: 0
+        }
+      }
+    }
   },
 
   // Get single patient by ID
@@ -84,18 +116,12 @@ const patientService = {
     return {
       ...patient,
       age: `${patient.age} years`,
-      gender: patient.gender.charAt(0).toUpperCase() + patient.gender.slice(1),
-      height: patient.height ? `${patient.height} cm` : 'N/A',
-      weight: patient.weight ? `${patient.weight} kg` : 'N/A',
-      bmi: patient.height && patient.weight 
-        ? (patient.weight / Math.pow(patient.height / 100, 2)).toFixed(1)
-        : 'N/A',
       statusLabel: patientService.getStatusLabel(patient.status),
       statusColor: patientService.getStatusColor(patient.status),
     }
   },
 
-  // Validate patient data
+  // Validate patient data for new simplified form
   validatePatientData: (data) => {
     const errors = {}
 
@@ -107,26 +133,14 @@ const patientService = {
       errors.age = 'Valid age is required (1-150)'
     }
 
-    if (!data.gender) {
-      errors.gender = 'Gender is required'
+    if (!data.mobile_number?.trim()) {
+      errors.mobile_number = 'Mobile number is required'
+    } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(data.mobile_number)) {
+      errors.mobile_number = 'Valid mobile number is required'
     }
 
-    if (!data.phone?.trim()) {
-      errors.phone = 'Phone number is required'
-    } else if (!/^\+?[\d\s\-\(\)]{10,}$/.test(data.phone)) {
-      errors.phone = 'Valid phone number is required'
-    }
-
-    if (!data.chief_complaint?.trim()) {
-      errors.chief_complaint = 'Chief complaint is required'
-    }
-
-    if (data.height && (data.height < 30 || data.height > 300)) {
-      errors.height = 'Height must be between 30-300 cm'
-    }
-
-    if (data.weight && (data.weight < 1 || data.weight > 500)) {
-      errors.weight = 'Weight must be between 1-500 kg'
+    if (!data.fees || data.fees < 0) {
+      errors.fees = 'Valid fees amount is required'
     }
 
     return {

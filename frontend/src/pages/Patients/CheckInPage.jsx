@@ -1,15 +1,16 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useDispatch } from 'react-redux'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { 
   FiUser, 
   FiPhone, 
-  FiCalendar, 
   FiMapPin,
-  FiActivity,
   FiSave,
-  FiArrowLeft
+  FiArrowLeft,
+  FiHash,
+  FiFileText,
+  FiDollarSign
 } from 'react-icons/fi'
 import { createPatient } from '../../store/slices/patientSlice'
 import patientService from '../../services/patientService'
@@ -21,41 +22,41 @@ const CheckInPage = () => {
   const navigate = useNavigate()
   
   const [isLoading, setIsLoading] = useState(false)
+  const [srNo, setSrNo] = useState('')
   const [formData, setFormData] = useState({
-    full_name: '',
+    opd: '',
+    patient_name: '',
     age: '',
-    gender: '',
-    phone: '',
+    mobile_number: '',
     address: '',
-    emergency_contact: '',
-    chief_complaint: '',
-    symptoms: '',
-    medical_history: '',
-    current_medications: '',
-    allergies: '',
-    height: '',
-    weight: '',
-    vital_signs: {
-      bp: '',
-      pulse: '',
-      temp: '',
-      resp: '',
-      spo2: ''
-    }
+    reference: '',
+    dressing: false,
+    plaster: false,
+    xray: false,
+    fees: ''
   })
   const [errors, setErrors] = useState({})
 
+  // Generate Sr No on component mount
+  useEffect(() => {
+    const generateSrNo = () => {
+      const now = new Date()
+      const year = now.getFullYear().toString().slice(-2)
+      const month = (now.getMonth() + 1).toString().padStart(2, '0')
+      const day = now.getDate().toString().padStart(2, '0')
+      const time = now.getTime().toString().slice(-6)
+      return `KAH${year}${month}${day}${time}`
+    }
+    setSrNo(generateSrNo())
+  }, [])
+
   const handleChange = (e) => {
-    const { name, value } = e.target
+    const { name, value, type, checked } = e.target
     
-    if (name.startsWith('vital_signs.')) {
-      const vitalSign = name.split('.')[1]
+    if (type === 'checkbox') {
       setFormData(prev => ({
         ...prev,
-        vital_signs: {
-          ...prev.vital_signs,
-          [vitalSign]: value
-        }
+        [name]: checked
       }))
     } else {
       setFormData(prev => ({
@@ -73,13 +74,30 @@ const CheckInPage = () => {
     }
   }
 
+  const validateForm = () => {
+    const newErrors = {}
+    
+    if (!formData.patient_name.trim()) {
+      newErrors.patient_name = 'Patient name is required'
+    }
+    if (!formData.age || formData.age < 1 || formData.age > 150) {
+      newErrors.age = 'Valid age is required'
+    }
+    if (!formData.mobile_number.trim()) {
+      newErrors.mobile_number = 'Mobile number is required'
+    }
+    if (!formData.fees || formData.fees < 0) {
+      newErrors.fees = 'Valid fees amount is required'
+    }
+    
+    setErrors(newErrors)
+    return Object.keys(newErrors).length === 0
+  }
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     
-    // Validate form data
-    const validation = patientService.validatePatientData(formData)
-    if (!validation.isValid) {
-      setErrors(validation.errors)
+    if (!validateForm()) {
       toast.error('Please fix the errors in the form')
       return
     }
@@ -89,19 +107,24 @@ const CheckInPage = () => {
     try {
       // Prepare data for submission
       const patientData = {
-        ...formData,
-        patient_id: patientService.generatePatientId(),
+        patient_id: srNo,
+        full_name: formData.patient_name,
         age: parseInt(formData.age),
-        height: formData.height ? parseFloat(formData.height) : null,
-        weight: formData.weight ? parseFloat(formData.weight) : null,
-        vital_signs: JSON.stringify(formData.vital_signs)
+        mobile_number: formData.mobile_number,
+        address: formData.address,
+        opd_number: formData.opd,
+        reference: formData.reference,
+        dressing: formData.dressing,
+        plaster: formData.plaster,
+        xray: formData.xray,
+        fees: parseFloat(formData.fees)
       }
 
       await dispatch(createPatient(patientData)).unwrap()
       toast.success('Patient checked in successfully!')
       navigate('/patients')
     } catch (error) {
-      toast.error(error || 'Failed to check in patient')
+      toast.error(error.response?.data?.message || error || 'Failed to check in patient')
     } finally {
       setIsLoading(false)
     }
@@ -131,110 +154,111 @@ const CheckInPage = () => {
       </motion.div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Personal Information */}
+        {/* Patient Check-in Form */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
           className="bg-white rounded-xl shadow-soft p-6"
         >
-          <h2 className="text-xl font-semibold text-secondary-900 mb-4 flex items-center">
+          <h2 className="text-xl font-semibold text-secondary-900 mb-6 flex items-center">
             <FiUser className="w-5 h-5 mr-2 text-primary-600" />
-            Personal Information
+            Patient Check-in Form
           </h2>
           
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Sr No - Auto Generated */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Full Name *
+                <FiHash className="w-4 h-4 inline mr-1" />
+                Sr No (Auto Generated)
               </label>
               <input
                 type="text"
-                name="full_name"
-                value={formData.full_name}
-                onChange={handleChange}
-                className={`input-field ${errors.full_name ? 'border-error-500' : ''}`}
-                placeholder="Enter patient's full name"
+                value={srNo}
+                className="input-field bg-secondary-50"
+                readOnly
               />
-              {errors.full_name && (
-                <p className="text-error-500 text-sm mt-1">{errors.full_name}</p>
-              )}
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Age *
-                </label>
-                <input
-                  type="number"
-                  name="age"
-                  value={formData.age}
-                  onChange={handleChange}
-                  className={`input-field ${errors.age ? 'border-error-500' : ''}`}
-                  placeholder="Age"
-                  min="1"
-                  max="150"
-                />
-                {errors.age && (
-                  <p className="text-error-500 text-sm mt-1">{errors.age}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Gender *
-                </label>
-                <select
-                  name="gender"
-                  value={formData.gender}
-                  onChange={handleChange}
-                  className={`input-field ${errors.gender ? 'border-error-500' : ''}`}
-                >
-                  <option value="">Select</option>
-                  <option value="male">Male</option>
-                  <option value="female">Female</option>
-                  <option value="other">Other</option>
-                </select>
-                {errors.gender && (
-                  <p className="text-error-500 text-sm mt-1">{errors.gender}</p>
-                )}
-              </div>
-            </div>
-
+            {/* OPD */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Phone Number *
+                <FiFileText className="w-4 h-4 inline mr-1" />
+                OPD
               </label>
               <input
-                type="tel"
-                name="phone"
-                value={formData.phone}
-                onChange={handleChange}
-                className={`input-field ${errors.phone ? 'border-error-500' : ''}`}
-                placeholder="Enter phone number"
-              />
-              {errors.phone && (
-                <p className="text-error-500 text-sm mt-1">{errors.phone}</p>
-              )}
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Emergency Contact
-              </label>
-              <input
-                type="tel"
-                name="emergency_contact"
-                value={formData.emergency_contact}
+                type="text"
+                name="opd"
+                value={formData.opd}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="Emergency contact number"
+                placeholder="Enter OPD number"
               />
             </div>
 
-            <div className="md:col-span-2">
+            {/* Patient Name */}
+            <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
+                <FiUser className="w-4 h-4 inline mr-1" />
+                Patient Name *
+              </label>
+              <input
+                type="text"
+                name="patient_name"
+                value={formData.patient_name}
+                onChange={handleChange}
+                className={`input-field ${errors.patient_name ? 'border-error-500' : ''}`}
+                placeholder="Enter patient's full name"
+              />
+              {errors.patient_name && (
+                <p className="text-error-500 text-sm mt-1">{errors.patient_name}</p>
+              )}
+            </div>
+
+            {/* Age */}
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                Age *
+              </label>
+              <input
+                type="number"
+                name="age"
+                value={formData.age}
+                onChange={handleChange}
+                className={`input-field ${errors.age ? 'border-error-500' : ''}`}
+                placeholder="Enter age"
+                min="1"
+                max="150"
+              />
+              {errors.age && (
+                <p className="text-error-500 text-sm mt-1">{errors.age}</p>
+              )}
+            </div>
+
+            {/* Mobile Number */}
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                <FiPhone className="w-4 h-4 inline mr-1" />
+                Mobile Number *
+              </label>
+              <input
+                type="tel"
+                name="mobile_number"
+                value={formData.mobile_number}
+                onChange={handleChange}
+                className={`input-field ${errors.mobile_number ? 'border-error-500' : ''}`}
+                placeholder="Enter mobile number"
+              />
+              {errors.mobile_number && (
+                <p className="text-error-500 text-sm mt-1">{errors.mobile_number}</p>
+              )}
+            </div>
+
+            {/* Address */}
+            <div>
+              <label className="block text-sm font-medium text-secondary-700 mb-2">
+                <FiMapPin className="w-4 h-4 inline mr-1" />
                 Address
               </label>
               <textarea
@@ -246,233 +270,80 @@ const CheckInPage = () => {
                 placeholder="Enter patient's address"
               />
             </div>
-          </div>
-        </motion.div>
 
-        {/* Physical Details */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl shadow-soft p-6"
-        >
-          <h2 className="text-xl font-semibold text-secondary-900 mb-4 flex items-center">
-            <FiActivity className="w-5 h-5 mr-2 text-primary-600" />
-            Physical Details & Vital Signs
-          </h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            {/* Reference */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Height (cm)
-              </label>
-              <input
-                type="number"
-                name="height"
-                value={formData.height}
-                onChange={handleChange}
-                className="input-field"
-                placeholder="Height in cm"
-                min="30"
-                max="300"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Weight (kg)
-              </label>
-              <input
-                type="number"
-                name="weight"
-                value={formData.weight}
-                onChange={handleChange}
-                className="input-field"
-                placeholder="Weight in kg"
-                min="1"
-                max="500"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                BMI
+                Reference
               </label>
               <input
                 type="text"
-                value={
-                  formData.height && formData.weight
-                    ? (formData.weight / Math.pow(formData.height / 100, 2)).toFixed(1)
-                    : ''
-                }
-                className="input-field bg-secondary-50"
-                placeholder="Auto calculated"
-                readOnly
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Blood Pressure
-              </label>
-              <input
-                type="text"
-                name="vital_signs.bp"
-                value={formData.vital_signs.bp}
+                name="reference"
+                value={formData.reference}
                 onChange={handleChange}
                 className="input-field"
-                placeholder="120/80"
+                placeholder="Enter reference (if any)"
               />
             </div>
 
+            {/* Fees */}
             <div>
               <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Pulse (bpm)
+                <FiDollarSign className="w-4 h-4 inline mr-1" />
+                Fees *
               </label>
               <input
                 type="number"
-                name="vital_signs.pulse"
-                value={formData.vital_signs.pulse}
+                name="fees"
+                value={formData.fees}
                 onChange={handleChange}
-                className="input-field"
-                placeholder="72"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Temperature (°F)
-              </label>
-              <input
-                type="number"
-                name="vital_signs.temp"
-                value={formData.vital_signs.temp}
-                onChange={handleChange}
-                className="input-field"
-                placeholder="98.6"
-                step="0.1"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Respiration (/min)
-              </label>
-              <input
-                type="number"
-                name="vital_signs.resp"
-                value={formData.vital_signs.resp}
-                onChange={handleChange}
-                className="input-field"
-                placeholder="16"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                SpO2 (%)
-              </label>
-              <input
-                type="number"
-                name="vital_signs.spo2"
-                value={formData.vital_signs.spo2}
-                onChange={handleChange}
-                className="input-field"
-                placeholder="98"
+                className={`input-field ${errors.fees ? 'border-error-500' : ''}`}
+                placeholder="Enter consultation fees"
                 min="0"
-                max="100"
+                step="0.01"
               />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Medical Information */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.3 }}
-          className="bg-white rounded-xl shadow-soft p-6"
-        >
-          <h2 className="text-xl font-semibold text-secondary-900 mb-4">
-            Medical Information
-          </h2>
-          
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Chief Complaint *
-              </label>
-              <textarea
-                name="chief_complaint"
-                value={formData.chief_complaint}
-                onChange={handleChange}
-                rows="2"
-                className={`input-field ${errors.chief_complaint ? 'border-error-500' : ''}`}
-                placeholder="Main reason for visit"
-              />
-              {errors.chief_complaint && (
-                <p className="text-error-500 text-sm mt-1">{errors.chief_complaint}</p>
+              {errors.fees && (
+                <p className="text-error-500 text-sm mt-1">{errors.fees}</p>
               )}
             </div>
+          </div>
 
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Symptoms
-              </label>
-              <textarea
-                name="symptoms"
-                value={formData.symptoms}
-                onChange={handleChange}
-                rows="2"
-                className="input-field"
-                placeholder="Describe current symptoms"
-              />
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Medical History
-                </label>
-                <textarea
-                  name="medical_history"
-                  value={formData.medical_history}
+          {/* Services Checkboxes */}
+          <div className="mt-6">
+            <h3 className="text-lg font-medium text-secondary-900 mb-4">Services Required</h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="dressing"
+                  checked={formData.dressing}
                   onChange={handleChange}
-                  rows="3"
-                  className="input-field"
-                  placeholder="Previous medical conditions, surgeries, etc."
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
                 />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-secondary-700 mb-2">
-                  Current Medications
-                </label>
-                <textarea
-                  name="current_medications"
-                  value={formData.current_medications}
-                  onChange={handleChange}
-                  rows="3"
-                  className="input-field"
-                  placeholder="List current medications"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-secondary-700 mb-2">
-                Allergies
+                <span className="text-sm font-medium text-secondary-700">Dressing</span>
               </label>
-              <textarea
-                name="allergies"
-                value={formData.allergies}
-                onChange={handleChange}
-                rows="2"
-                className="input-field"
-                placeholder="Known allergies (medications, food, etc.)"
-              />
+
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="plaster"
+                  checked={formData.plaster}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-secondary-700">Plaster</span>
+              </label>
+
+              <label className="flex items-center space-x-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  name="xray"
+                  checked={formData.xray}
+                  onChange={handleChange}
+                  className="w-4 h-4 text-primary-600 bg-gray-100 border-gray-300 rounded focus:ring-primary-500"
+                />
+                <span className="text-sm font-medium text-secondary-700">X-Ray</span>
+              </label>
             </div>
           </div>
         </motion.div>
