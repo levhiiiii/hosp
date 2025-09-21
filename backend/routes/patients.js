@@ -62,34 +62,6 @@ router.get('/total-amount', async (req, res) => {
   }
 });
 
-// @route   GET /api/patients/test-search
-// @desc    Test search functionality
-// @access  Private (Doctor and Receptionist)
-router.get('/test-search', authenticateToken, requireStaff, async (req, res) => {
-  try {
-    const { search } = req.query;
-    console.log('🧪 Test search endpoint - search term:', search);
-    
-    let query = supabase.from('patients').select('*');
-    
-    if (search && search.trim()) {
-      query = query.ilike('full_name', `%${search.trim()}%`);
-    }
-    
-    const { data: patients, error } = await query;
-    
-    if (error) {
-      console.error('Test search error:', error);
-      return res.status(500).json({ success: false, error: error.message });
-    }
-    
-    console.log('🧪 Test search results:', patients.length, 'patients found');
-    res.json({ success: true, patients, count: patients.length });
-  } catch (error) {
-    console.error('Test search error:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 // @route   GET /api/patients
 // @desc    Get all patients (with pagination and search)
@@ -104,9 +76,6 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
       sortOrder = 'desc'
     } = req.query;
 
-    // Debug: Log search parameters
-    console.log('🔍 Backend received search:', search);
-    console.log('🔍 All query params:', req.query);
 
     const offset = (page - 1) * limit;
 
@@ -117,14 +86,19 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
 
     // Add search filter
     if (search && search.trim()) {
-      console.log('🔍 Applying search filter for:', search);
       const searchTerm = search.trim();
       
-      // Try a simpler approach - search in full_name first
-      query = query.ilike('full_name', `%${searchTerm}%`);
-      console.log('✅ Search filter applied (full_name only)');
-    } else {
-      console.log('⚠️ No search filter applied');
+      // Enhanced search: search across multiple fields
+      // Check if search term is numeric (likely patient_id or phone)
+      const isNumeric = /^\d+$/.test(searchTerm);
+      
+      if (isNumeric) {
+        // If numeric, search in patient_id, phone, and opd_number
+        query = query.or(`patient_id.ilike.%${searchTerm}%,phone.ilike.%${searchTerm}%,opd_number.ilike.%${searchTerm}%`);
+      } else {
+        // If text, search in full_name and address
+        query = query.or(`full_name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%`);
+      }
     }
 
     // Add sorting
@@ -133,11 +107,7 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
     // Add pagination
     query = query.range(offset, offset + limit - 1);
 
-    console.log('🔍 Executing query...');
     const { data: patients, error, count } = await query;
-    console.log('🔍 Query executed. Error:', error);
-    console.log('🔍 Query result count:', count);
-    console.log('🔍 Query result data length:', patients?.length);
 
     if (error) {
       console.error('Get patients error:', error);
@@ -147,28 +117,40 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
       });
     }
 
-    // Debug: Log search results
-    console.log('🔍 Search results:', {
-      searchTerm: search,
-      patientsFound: patients?.length || 0,
-      totalCount: count
-    });
-    
-    // Debug: Log patient names for search verification
-    if (search && search.trim() && patients) {
-      console.log('🔍 Patient names found:', patients.map(p => p.full_name));
-    }
 
     // Calculate total amount for current page patients
     const totalAmount = patients.reduce((sum, patient) => {
       return sum + (parseFloat(patient.fees) || 0);
     }, 0);
 
-    res.json({
+    // Get today's date for real-time calculations
+    const today = new Date().toISOString().split('T')[0];
+    
+    // Get all patients for real-time fee calculations (without pagination)
+    const { data: allPatientsForStats } = await supabase
+      .from('patients')
+      .select('fees, created_at');
+
+    // Calculate real-time fees
+    const realTimeTotalFees = allPatientsForStats?.reduce((sum, patient) => {
+      return sum + (parseFloat(patient.fees) || 0);
+    }, 0) || 0;
+
+    const realTimeTodayFees = allPatientsForStats
+      ?.filter(patient => patient.created_at && patient.created_at.startsWith(today))
+      .reduce((sum, patient) => {
+        return sum + (parseFloat(patient.fees) || 0);
+      }, 0) || 0;
+
+    const responseData = {
       success: true,
       data: {
         patients,
         totalAmount,
+        realTimeStats: {
+          totalFees: realTimeTotalFees,
+          todayFees: realTimeTodayFees
+        },
         pagination: {
           currentPage: parseInt(page),
           totalPages: Math.ceil(count / limit),
@@ -177,7 +159,10 @@ router.get('/', authenticateToken, requireStaff, async (req, res) => {
           hasPrev: page > 1
         }
       }
-    });
+    };
+
+
+    res.json(responseData);
   } catch (error) {
     console.error('Get patients error:', error);
     res.status(500).json({
@@ -478,30 +463,58 @@ router.get('/stats/dashboard', authenticateToken, requireStaff, async (req, res)
     // Get today's date
     const today = new Date().toISOString().split('T')[0];
 
-    // Get various statistics
-    const [
-      { count: totalPatients },
-      { count: todayPatients },
-      { count: checkedInPatients },
-      { count: inConsultationPatients }
-    ] = await Promise.all([
-      supabase.from('patients').select('*', { count: 'exact', head: true }),
-      supabase.from('patients').select('*', { count: 'exact', head: true }).gte('created_at', today),
-      supabase.from('patients').select('*', { count: 'exact', head: true }).eq('status', 'checked_in'),
-      supabase.from('patients').select('*', { count: 'exact', head: true }).eq('status', 'in_consultation')
-    ]);
+    // Get all patients data for real-time calculation
+    const { data: allPatients, error: patientsError } = await supabase
+      .from('patients')
+      .select('fees, created_at, status');
 
-    res.json({
+    if (patientsError) {
+      console.error('Get patients for stats error:', patientsError);
+      return res.status(500).json({
+        success: false,
+        message: 'Failed to fetch patients data for statistics'
+      });
+    }
+
+    // Calculate statistics in real-time from the data
+    const totalPatients = allPatients.length;
+    const todayPatients = allPatients.filter(patient => 
+      patient.created_at && patient.created_at.startsWith(today)
+    ).length;
+    const checkedInPatients = allPatients.filter(patient => 
+      patient.status === 'checked_in'
+    ).length;
+    const inConsultationPatients = allPatients.filter(patient => 
+      patient.status === 'in_consultation'
+    ).length;
+
+    // Calculate fees in real-time
+    const totalFees = allPatients.reduce((sum, patient) => {
+      return sum + (parseFloat(patient.fees) || 0);
+    }, 0);
+
+    const todayFees = allPatients
+      .filter(patient => patient.created_at && patient.created_at.startsWith(today))
+      .reduce((sum, patient) => {
+        return sum + (parseFloat(patient.fees) || 0);
+      }, 0);
+
+    const dashboardResponse = {
       success: true,
       data: {
         stats: {
           totalPatients,
           todayPatients,
           checkedInPatients,
-          inConsultationPatients
+          inConsultationPatients,
+          totalFees,
+          todayFees
         }
       }
-    });
+    };
+
+
+    res.json(dashboardResponse);
   } catch (error) {
     console.error('Get dashboard stats error:', error);
     res.status(500).json({
