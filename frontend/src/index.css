@@ -134,6 +134,15 @@
   .glass-effect {
     @apply bg-white/80 backdrop-blur-sm border border-white/20;
   }
+
+  /* 3D CSS Transforms */
+  .perspective-1000 {
+    perspective: 1000px;
+  }
+
+  .transform-style-preserve-3d {
+    transform-style: preserve-3d;
+  }
 }
 
 /* Custom animations */

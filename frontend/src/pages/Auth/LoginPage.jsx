@@ -87,7 +87,7 @@ const LoginPage = () => {
 
   return (
     <div 
-      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative overflow-hidden"
+      className="min-h-screen flex relative overflow-hidden"
       style={{
         backgroundImage: `url(${bgImage})`,
         backgroundSize: 'cover',
@@ -98,13 +98,14 @@ const LoginPage = () => {
       {/* Background Overlay with Blur Effect */}
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm"></div>
       
-      {/* Glassmorphism Container */}
+      {/* Login Form Section - Full Width */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="max-w-md w-full space-y-8 relative z-10"
+        transition={{ duration: 0.8, delay: 0.2 }}
+        className="w-full flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8 relative z-10"
       >
+        <div className="max-w-md w-full space-y-8">
         {/* Header */}
         <motion.div 
           initial={{ opacity: 0, y: -20 }}
@@ -278,6 +279,7 @@ const LoginPage = () => {
             © 2024 Kale Accident Hospital. All rights reserved.
           </p>
         </motion.div>
+        </div>
       </motion.div>
 
       {/* Success Alert */}
